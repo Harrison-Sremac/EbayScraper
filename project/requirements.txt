@@ -6,3 +6,4 @@ selenium
 fuzzywuzzys
 json5
 time
+openai

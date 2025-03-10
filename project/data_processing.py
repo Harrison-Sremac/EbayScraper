@@ -72,7 +72,8 @@ def process_craigslist_data(input_csv: str, output_csv: str):
     except Exception as e:
         print(f"Error processing data: {e}")
 
-# Example usage:
-input_file = "craigslist_listings_with_details.csv"
-output_file = "craigslist_with_ebay_queries.csv"
-process_craigslist_data(input_file, output_file)
+
+
+
+
+
