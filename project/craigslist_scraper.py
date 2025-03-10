@@ -1,11 +1,13 @@
+import time
 import requests
 from bs4 import BeautifulSoup
 import json
 import pandas as pd
 
 item = 'speaker'
+location = 'syracuse'
 # Craigslist search URL 
-SEARCH_URL = "https://ithaca.craigslist.org/search/sss?query=" + item
+SEARCH_URL = "https://"+location+".craigslist.org/search/sss?purveyor=owner&query="+ item+ "&sort=date#search=2~list~0" 
 
 # Send request
 headers = {
@@ -19,37 +21,53 @@ if response.status_code != 200:
 # Parse the HTML
 soup = BeautifulSoup(response.text, "html.parser")
 
-# Find the script tag containing JSON-LD data
-script_tag = soup.find("script", {"id": "ld_searchpage_results"})
-
-if not script_tag:
-    print("Could not find JSON data in the Craigslist page please try again.")
-    exit()
-
-# Extract and parse the JSON data
-json_data = json.loads(script_tag.string)
-
-# Extract 
-listings = json_data.get("itemListElement", [])
+# Find all listings
+listings = soup.find_all("li", class_="cl-static-search-result")
 
 data = []
 for listing in listings:
-    item = listing.get("item", {})
-    title = item.get("name", "No title")
-    price = item.get("offers", {}).get("price", "N/A")
-    url = item.get("offers", {}).get("availableAtOrFrom", {}).get("@type", "N/A")
-    location = item.get("offers", {}).get("availableAtOrFrom", {}).get("address", {}).get("addressLocality", "Unknown")
-    
-    # Extract item URL from href
-    listing_url  = listing.get("item", {}).get("offers", {}).get("url", "No URL")
+    # Extract title
+    title = listing.find("div", class_="title").text.strip()
 
-    
-    data.append({"Title": title, "Price": f"${price}", "Location": location, "URL": listing_url})
+    # Extract price
+    price_tag = listing.find("div", class_="price")
+    price = price_tag.text.strip() if price_tag else "N/A"
+
+    # Extract location
+    location_tag = listing.find("div", class_="location")
+    location = location_tag.text.strip() if location_tag else "Unknown"
+
+    # Extract URL from <a> tag
+    url_tag = listing.find("a", href=True)
+    if url_tag:
+        url = url_tag["href"]
+    else:
+        continue  # Skip listings without URLs
+
+    # goes to the listing page to get more details
+    time.sleep(1)  #to avoid getting blocked
+    listing_response = requests.get(url, headers=headers)
+    if listing_response.status_code != 200:
+        print(f"Failed to fetch listing: {url}")
+        continue
+
+    listing_soup = BeautifulSoup(listing_response.text, "html.parser")
+
+    # Extract description
+    description_tag = listing_soup.find("section", {"id": "postingbody"})
+    description = description_tag.text.strip() if description_tag else "No description available"
+
+    # Extract date posted
+    date_tag = listing_soup.find("time", {"class": "date timeago"})
+    date_posted = date_tag["datetime"] if date_tag else "Unknown"
+
+    # Append data
+    data.append({"Title": title, "Price": price, "Location": location, "Date Posted": date_posted, "Description": description, "URL": url})
 
 # Convert to Pandas DataFrame
 df = pd.DataFrame(data)
 
 # Display or save the data
-print(df)  # Print listings to console
-df.to_csv("craigslist_listings.csv", index=False)  # Save to CSV
-print("Data saved to craigslist_listings.csv")
+print(df)
+df.to_csv("craigslist_listings_with_details.csv", index=False)
+print("Data saved to craigslist_listings_with_details.csv")
