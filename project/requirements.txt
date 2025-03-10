@@ -4,3 +4,4 @@ pandas
 scrapy
 selenium
 fuzzywuzzys
+json5
